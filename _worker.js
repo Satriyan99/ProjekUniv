@@ -1,23 +1,23 @@
 import { connect } from "cloudflare:sockets";
-// list proxyIP untuk web
+
+// URL daftar proxy IP
 const DEFAULT_PROXY_BANK_URL = "https://raw.githubusercontent.com/InconigtoVPN/ProxyIP/refs/heads/main/proxyList.txt";
-// list proxyIP untuk link subs
 const DEFAULT_PROXY_BANK_URL2 = "https://raw.githubusercontent.com/InconigtoVPN/InconigtoVPN/refs/heads/main/iplist.txt";
 
-// Global Variables yang bisa di edit
+// Variabel global yang dapat diedit
 let cachedProxyList = [];
 let proxyIP = "";
 let apiCheck = "https://ipcf.rmtq.fun/json/?ip=";
 
-// watermark path
+// Informasi tambahan
 let pathinfo = "rmtqwrt";
-// nama web 
 let nameWEB = "RMTQ-WRT";
 let telegram = "Noir7R";
 
-// Constants
+// Konstanta WebSocket
 const WS_READY_STATE_OPEN = 1;
 const WS_READY_STATE_CLOSING = 2;
+
 
 // async function getProxyList(env, forceReload = false) {
 //  try {
@@ -51,20 +51,23 @@ const WS_READY_STATE_CLOSING = 2;
 // }
 async function getProxyList(env, forceReload = false) {
   try {
+    // Cek apakah cache kosong atau ada permintaan untuk memuat ulang
     if (!cachedProxyList.length || forceReload) {
       const proxyBankUrl = env.PROXY_BANK_URL || DEFAULT_PROXY_BANK_URL;
-      const proxyBankResponse = await fetch(proxyBankUrl);
+      const response = await fetch(proxyBankUrl);
 
-      if (!proxyBankResponse.ok) {
-        throw new Error(`Failed to fetch proxy list: ${proxyBankResponse.status}`);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch proxy list: ${response.status}`);
       }
 
-      const proxyLines = (await proxyBankResponse.text()).split("\n").filter(Boolean);
+      // Parsing daftar proxy
+      const proxyLines = (await response.text()).split("\n").filter(Boolean);
       cachedProxyList = proxyLines.map((line) => {
         const [proxyIP, proxyPort, country, org] = line.split(",");
         return { proxyIP, proxyPort, country, org };
       });
     }
+
     return cachedProxyList;
   } catch (error) {
     console.error("Error fetching proxy list:", error);
@@ -72,27 +75,31 @@ async function getProxyList(env, forceReload = false) {
   }
 }
 
-
 async function checkIPAndPort(ip, port) {
   const apiUrl = `${apiCheck}${ip}:${port}`;
+
   try {
-    const apiResponse = await fetch(apiUrl);
-    const apiData = await apiResponse.json();
+    const response = await fetch(apiUrl);
+    const data = await response.json();
+
     const result = {
-      ip: ip,
-      port: port,
-      status: apiData.STATUS || null
+      ip,
+      port,
+      status: data.STATUS || null,
     };
+
     return new Response(JSON.stringify(result, null, 2), {
       status: 200,
-      headers: { "Content-Type": "application/json;charset=utf-8" }
+      headers: { "Content-Type": "application/json;charset=utf-8" },
     });
-  } catch (err) {
-    return new Response(`An error occurred while fetching API: ${err.toString()}`, {
+
+  } catch (error) {
+    return new Response(`An error occurred while fetching API: ${error.toString()}`, {
       status: 500,
     });
   }
 }
+
 
 export default {
   async fetch(request, env, ctx) {
@@ -101,15 +108,16 @@ export default {
       const upgradeHeader = request.headers.get("Upgrade");
 
       const inconigto = url.hostname;
-      const type = url.searchParams.get('type') || 'mix';
-      const tls = url.searchParams.get('tls') !== 'false';
-      const wildcard = url.searchParams.get('wildcard') === 'true';
-      const bugs = url.searchParams.get('bug') || inconigto;
+      const type = url.searchParams.get("type") || "mix";
+      const tls = url.searchParams.get("tls") !== "false";
+      const wildcard = url.searchParams.get("wildcard") === "true";
+      const bugs = url.searchParams.get("bug") || inconigto;
       const inconigtomode = wildcard ? `${bugs}.${inconigto}` : inconigto;
-      const country = url.searchParams.get('country');
-      const limit = parseInt(url.searchParams.get('limit'), 10);
+      const country = url.searchParams.get("country");
+      const limit = parseInt(url.searchParams.get("limit"), 10);
       let configs;
 
+      // Jika path diakses dengan format IP:PORT, lakukan pengecekan IP dan port
       if (url.pathname.startsWith("/")) {
         const pathParts = url.pathname.slice(1).split(":");
         if (pathParts.length === 2) {
@@ -118,7 +126,7 @@ export default {
         }
       }
 
-      // Map untuk menyimpan proxy per country code
+      // Map untuk menyimpan proxy per kode negara
       const proxyState = new Map();
 
       // Fungsi untuk memperbarui proxy setiap menit
@@ -140,6 +148,7 @@ export default {
         })()
       );
 
+      // Penanganan WebSocket
       if (upgradeHeader === "websocket") {
         if (!url.pathname.startsWith(`/${pathinfo}/`)) {
           console.log(`Blocked request (Invalid Path): ${url.pathname}`);
@@ -147,7 +156,6 @@ export default {
         }
 
         const cleanPath = url.pathname.replace(`/${pathinfo}/`, "");
-
         const pathMatch = cleanPath.match(/^([A-Z]{2})(\d+)?$/);
 
         if (pathMatch) {
@@ -163,7 +171,8 @@ export default {
             return new Response(null, { status: 403 });
           }
 
-          let selectedProxy = index === null ? (proxyState.get(countryCode) || filteredProxies[0]) : filteredProxies[index];
+          let selectedProxy =
+            index === null ? proxyState.get(countryCode) || filteredProxies[0] : filteredProxies[index];
 
           proxyIP = `${selectedProxy.proxyIP}:${selectedProxy.proxyPort}`;
           console.log(`Selected Proxy: ${proxyIP}`);
@@ -171,7 +180,6 @@ export default {
         }
 
         const ipPortMatch = cleanPath.match(/^(.+[^.\d\w]\d+)$/);
-
         if (ipPortMatch) {
           proxyIP = ipPortMatch[1].replace(/[^.\d\w]+/g, ":");
           console.log(`Direct Proxy IP: ${proxyIP}`);
@@ -182,30 +190,33 @@ export default {
         return new Response(null, { status: 403 });
       }
 
+      // Routing untuk subscription generator
       switch (url.pathname) {
-        case '/sub/clash':
+        case "/sub/clash":
           configs = await generateClashSub(type, bugs, inconigtomode, tls, country, limit);
           break;
-        case '/sub/surfboard':
+        case "/sub/surfboard":
           configs = await generateSurfboardSub(type, bugs, inconigtomode, tls, country, limit);
           break;
-        case '/sub/singbox':
+        case "/sub/singbox":
           configs = await generateSingboxSub(type, bugs, inconigtomode, tls, country, limit);
           break;
-        case '/sub/husi':
+        case "/sub/husi":
           configs = await generateHusiSub(type, bugs, inconigtomode, tls, country, limit);
           break;
-        case '/sub/nekobox':
+        case "/sub/nekobox":
           configs = await generateNekoboxSub(type, bugs, inconigtomode, tls, country, limit);
           break;
-        case '/sub/v2rayng':
+        case "/sub/v2rayng":
           configs = await generateV2rayngSub(type, bugs, inconigtomode, tls, country, limit);
           break;
-        case '/sub/v2ray':
+        case "/sub/v2ray":
           configs = await generateV2raySub(type, bugs, inconigtomode, tls, country, limit);
           break;
         case "/sub":
-          return new Response(await handleSubRequest(url.hostname), { headers: { 'Content-Type': 'text/html' } });
+          return new Response(await handleSubRequest(url.hostname), {
+            headers: { "Content-Type": "text/html" },
+          });
         default:
           const hostname = request.headers.get("Host");
           const result = getAllConfig(hostname, await getProxyList(env, true));
@@ -224,13 +235,18 @@ export default {
   },
 };
 
+
 // Helper function: Group proxies by country
 function groupBy(array, key) {
-  return array.reduce((result, currentValue) => {
-    (result[currentValue[key]] = result[currentValue[key]] || []).push(currentValue);
+  return array.reduce((result, item) => {
+    if (!result[item[key]]) {
+      result[item[key]] = [];
+    }
+    result[item[key]].push(item);
     return result;
   }, {});
 }
+
 
 function getAllConfig(hostName, proxyList) {
   const encodePath = (proxyIP, proxyPort) => {
@@ -3547,70 +3563,33 @@ async function generateV2rayngSub(type, bug, inconigtomode, tls, country = null,
 
   return base64Conf;
 }
+
+
 async function generateV2raySub(type, bug, inconigtomode, tls, country = null, limit = null) {
-  const proxyListResponse = await fetch(DEFAULT_PROXY_BANK_URL2);
-  const proxyList = await proxyListResponse.text();
-  let ips = proxyList
-    .split('\n')
-    .filter(Boolean)
-  if (country && country.toLowerCase() === 'random') {
-    // Pilih data secara acak jika country=random
-    ips = ips.sort(() => Math.random() - 0.5); // Acak daftar proxy
-  } else if (country) {
-    // Filter berdasarkan country jika bukan "random"
-    ips = ips.filter(line => {
-      const parts = line.split(',');
-      if (parts.length > 1) {
-        const lineCountry = parts[2].toUpperCase();
-        return lineCountry === country.toUpperCase();
-      }
-      return false;
-    });
-  }
-  if (limit && !isNaN(limit)) {
-    ips = ips.slice(0, limit); // Batasi jumlah proxy berdasarkan limit
-  }
-  let conf = '';
-  for (let line of ips) {
-    const parts = line.split(',');
-    const proxyHost = parts[0];
-    const proxyPort = parts[1] || 443;
-    const emojiFlag = getEmojiFlag(line.split(',')[2]); // Konversi ke emoji bendera
-    const UUIDS = generateUUIDv4();
-    const information = encodeURIComponent(`${emojiFlag} (${line.split(',')[2]}) ${line.split(',')[3]}`);
-    if (type === 'vless') {
-      if (tls) {
-        conf += `vless://${UUIDS}@${bug}:443?encryption=none&security=tls&sni=${inconigtomode}&fp=randomized&type=ws&host=${inconigtomode}&path=%2F${pathinfo}%2F${proxyHost}%2F${proxyPort}#${information}-[VL]-[${nameWEB}]\n`;
-      } else {
-        conf += `vless://${UUIDS}@${bug}:80?path=%2F${pathinfo}%2F${proxyHost}%2F${proxyPort}&security=none&encryption=none&host=${inconigtomode}&fp=randomized&type=ws&sni=${inconigtomode}#${information}-[VL]-[${nameWEB}]\n`;
-      }
-    } else if (type === 'trojan') {
-      if (tls) {
-        conf += `trojan://${UUIDS}@${bug}:443?encryption=none&security=tls&sni=${inconigtomode}&fp=randomized&type=ws&host=${inconigtomode}&path=%2F${pathinfo}%2F${proxyHost}%2F${proxyPort}#${information}-[TR]-[${nameWEB}]\n`;
-      } else {
-        conf += `trojan://${UUIDS}@${bug}:80?path=%2F${pathinfo}%2F${proxyHost}%2F${proxyPort}&security=none&encryption=none&host=${inconigtomode}&fp=randomized&type=ws&sni=${inconigtomode}#${information}-[TR]-[${nameWEB}]\n`;
-      }
-    } else if (type === 'shadowsocks') {
-      if (tls) {
-        conf += `ss://${btoa(`none:${UUIDS}`)}%3D@${bug}:443?encryption=none&type=ws&host=${inconigtomode}&path=%2F${pathinfo}%2F${proxyHost}%2F${proxyPort}&security=tls&sni=${inconigtomode}#${information}-[SS]-[${nameWEB}]\n`;
-      } else {
-        conf += `ss://${btoa(`none:${UUIDS}`)}%3D@${bug}:80?encryption=none&type=ws&host=${inconigtomode}&path=%2F${pathinfo}%2F${proxyHost}%2F${proxyPort}&security=none&sni=${inconigtomode}#${information}-[SS]-[${nameWEB}]\n`;
-      }
-    } else if (type === 'mix') {
-      if (tls) {
-        conf += `vless://${UUIDS}@${bug}:443?encryption=none&security=tls&sni=${inconigtomode}&fp=randomized&type=ws&host=${inconigtomode}&path=%2F${pathinfo}%2F${proxyHost}%2F${proxyPort}#${information}-[VL]-[${nameWEB}]\n`;
-        conf += `trojan://${UUIDS}@${bug}:443?encryption=none&security=tls&sni=${inconigtomode}&fp=randomized&type=ws&host=${inconigtomode}&path=%2F${pathinfo}%2F${proxyHost}%2F${proxyPort}#${information}-[TR]-[${nameWEB}]\n`;
-        conf += `ss://${btoa(`none:${UUIDS}`)}%3D@${bug}:443?encryption=none&type=ws&host=${inconigtomode}&path=%2F${pathinfo}%2F${proxyHost}%2F${proxyPort}&security=tls&sni=${inconigtomode}#${information}-[SS]-[${nameWEB}]\n`;
-      } else {
-        conf += `vless://${UUIDS}@${bug}:80?path=%2F${pathinfo}%2F${proxyHost}%2F${proxyPort}&security=none&encryption=none&host=${inconigtomode}&fp=randomized&type=ws&sni=${inconigtomode}#${information}-[VL]-[${nameWEB}]\n`;
-        conf += `trojan://${UUIDS}@${bug}:80?path=%2F${pathinfo}%2F${proxyHost}%2F${proxyPort}&security=none&encryption=none&host=${inconigtomode}&fp=randomized&type=ws&sni=${inconigtomode}#${information}-[TR]-[${nameWEB}]\n`;
-        conf += `ss://${btoa(`none:${UUIDS}`)}%3D@${bug}:80?encryption=none&type=ws&host=${inconigtomode}&path=%2F${pathinfo}%2F${proxyHost}%2F${proxyPort}&security=none&sni=${inconigtomode}#${information}-[SS]-[${nameWEB}]\n`;
-      }
-    }
-  }
+  const proxyList = (await (await fetch(DEFAULT_PROXY_BANK_URL2)).text()).split('\n').filter(Boolean);
+  let ips = country ? (country.toLowerCase() === 'random' ? proxyList.sort(() => Math.random() - 0.5) : proxyList.filter(line => line.split(',')[2]?.toUpperCase() === country.toUpperCase())) : proxyList;
+  if (limit && !isNaN(limit)) ips = ips.slice(0, limit);
   
-  return conf;
+  return ips.map(line => {
+    const [proxyHost, proxyPort = 443, countryCode, isp] = line.split(',');
+    const UUIDS = generateUUIDv4();
+    const information = encodeURIComponent(`${getEmojiFlag(countryCode)} (${countryCode}) ${isp}`);
+    const baseConfig = `${UUIDS}@${bug}:${tls ? 443 : 80}?${tls ? 'security=tls&sni' : 'security=none&sni'}=${inconigtomode}&fp=randomized&type=ws&host=${inconigtomode}&path=%2F${pathinfo}%2F${proxyHost}%2F${proxyPort}`;
+    
+    switch (type) {
+      case 'vless': return `vless://${baseConfig}#${information}-[VL]-[${nameWEB}]`;
+      case 'trojan': return `trojan://${baseConfig}#${information}-[TR]-[${nameWEB}]`;
+      case 'shadowsocks': return `ss://${btoa(`none:${UUIDS}`)}%3D@${bug}:${tls ? 443 : 80}?encryption=none&type=ws&host=${inconigtomode}&path=%2F${pathinfo}%2F${proxyHost}%2F${proxyPort}&${tls ? 'security=tls' : 'security=none'}&sni=${inconigtomode}#${information}-[SS]-[${nameWEB}]`;
+      case 'mix': return [
+        `vless://${baseConfig}#${information}-[VL]-[${nameWEB}]`,
+        `trojan://${baseConfig}#${information}-[TR]-[${nameWEB}]`,
+        `ss://${btoa(`none:${UUIDS}`)}%3D@${bug}:${tls ? 443 : 80}?encryption=none&type=ws&host=${inconigtomode}&path=%2F${pathinfo}%2F${proxyHost}%2F${proxyPort}&${tls ? 'security=tls' : 'security=none'}&sni=${inconigtomode}#${information}-[SS]-[${nameWEB}]`
+      ].join('\n');
+    }
+  }).join('\n');
 }
+
+
 function generateUUIDv4() {
   const randomValues = crypto.getRandomValues(new Uint8Array(16));
   randomValues[6] = (randomValues[6] & 0x0f) | 0x40;
