@@ -2865,6 +2865,7 @@ ${conf}
   }
 }`;
 }
+
 async function generateSingboxSub(type, bug, inconigtomode, tls, country = null, limit = null) {
   const proxyListResponse = await fetch(DEFAULT_PROXY_BANK_URL2);
   const proxyList = await proxyListResponse.text();
@@ -3158,6 +3159,7 @@ ${conf}
   }
 }`;
 }
+
 async function generateNekoboxSub(type, bug, inconigtomode, tls, country = null, limit = null) {
   const proxyListResponse = await fetch(DEFAULT_PROXY_BANK_URL2);
   const proxyList = await proxyListResponse.text();
@@ -3488,80 +3490,62 @@ ${conf}
   }
 }`;
 }
+
 async function generateV2rayngSub(type, bug, inconigtomode, tls, country = null, limit = null) {
   const proxyListResponse = await fetch(DEFAULT_PROXY_BANK_URL2);
   const proxyList = await proxyListResponse.text();
-  let ips = proxyList
-    .split('\n')
-    .filter(Boolean);
-
-  if (country && country.toLowerCase() === 'random') {
-    // Pilih data secara acak jika country=random
-    ips = ips.sort(() => Math.random() - 0.5); // Acak daftar proxy
-  } else if (country) {
-    // Filter berdasarkan country jika bukan "random"
-    ips = ips.filter(line => {
-      const parts = line.split(',');
-      if (parts.length > 1) {
-        const lineCountry = parts[2].toUpperCase();
-        return lineCountry === country.toUpperCase();
-      }
-      return false;
-    });
-  }
   
+  let ips = proxyList.split('\n').filter(Boolean);
+
+  if (country) {
+    if (country.toLowerCase() === 'random') {
+      ips = ips.sort(() => 0.5 - Math.random()); // Acak daftar proxy
+    } else {
+      ips = ips.filter(line => {
+        const parts = line.split(',');
+        return parts.length > 1 && parts[2].toUpperCase() === country.toUpperCase();
+      });
+    }
+  }
+
   if (limit && !isNaN(limit)) {
     ips = ips.slice(0, limit); // Batasi jumlah proxy berdasarkan limit
   }
 
-  let conf = '';
+  // Fungsi untuk membuat format konfigurasi berdasarkan jenis
+  function generateConfig(protocol, UUIDS, proxyHost, proxyPort, ispInfo) {
+    const secure = tls ? "tls" : "none";
+    const port = tls ? 443 : 80;
+    const sni = tls ? `&sni=${inconigtomode}` : "";
+    const security = tls ? "&security=tls" : "&security=none";
 
-  for (let line of ips) {
-    const parts = line.split(',');
-    const proxyHost = parts[0];
-    const proxyPort = parts[1] || 443;
-    const countryCode = parts[2]; // Kode negara ISO
-    const isp = parts[3]; // Informasi ISP
+    const basePath = `%2F${pathinfo}%2F${proxyHost}%2F${proxyPort}`;
+    const commonParams = `?encryption=none&type=ws&host=${inconigtomode}&path=${basePath}${security}${sni}`;
 
-    // Gunakan teks Latin-1 untuk menggantikan emoji flag
-    const countryText = `[${countryCode}]`; // Format bendera ke teks Latin-1
-    const ispInfo = `${countryText} ${isp}`;
-    const UUIDS = `${generateUUIDv4()}`;
+    const configs = {
+      vless: `vless://${UUIDS}@${bug}:${port}${commonParams}&fp=randomized#${ispInfo}-[VL]-[${nameWEB}]`,
+      trojan: `trojan://${UUIDS}@${bug}:${port}${commonParams}&fp=randomized#${ispInfo}-[TR]-[${nameWEB}]`,
+      shadowsocks: `ss://${btoa(`none:${UUIDS}`)}%3D@${bug}:${port}${commonParams}#${ispInfo}-[SS]-[${nameWEB}]`
+    };
 
-    if (type === 'vless') {
-      if (tls) {
-        conf += `vless://${UUIDS}\u0040${bug}:443?encryption=none&security=tls&sni=${inconigtomode}&fp=randomized&type=ws&host=${inconigtomode}&path=%2F${pathinfo}%2F${proxyHost}%2F${proxyPort}#${ispInfo}-[VL]-[${nameWEB}]\n`;
-      } else {
-        conf += `vless://${UUIDS}\u0040${bug}:80?path=%2F${pathinfo}%2F${proxyHost}%2F${proxyPort}&security=none&encryption=none&host=${inconigtomode}&fp=randomized&type=ws&sni=${inconigtomode}#${ispInfo}-[VL]-[${nameWEB}]\n`;
-      }
-    } else if (type === 'trojan') {
-      if (tls) {
-        conf += `trojan://${UUIDS}\u0040${bug}:443?encryption=none&security=tls&sni=${inconigtomode}&fp=randomized&type=ws&host=${inconigtomode}&path=%2F${pathinfo}%2F${proxyHost}%2F${proxyPort}#${ispInfo}-[TR]-[${nameWEB}]\n`;
-      } else {
-        conf += `trojan://${UUIDS}\u0040${bug}:80?path=%2F${pathinfo}%2F${proxyHost}%2F${proxyPort}&security=none&encryption=none&host=${inconigtomode}&fp=randomized&type=ws&sni=${inconigtomode}#${ispInfo}-[TR]-[${nameWEB}]\n`;
-      }
-    } else if (type === 'shadowsocks') {
-      if (tls) {
-        conf += `ss://${btoa(`none:${UUIDS}`)}%3D@${bug}:443?encryption=none&type=ws&host=${inconigtomode}&path=%2F${pathinfo}%2F${proxyHost}%2F${proxyPort}&security=tls&sni=${inconigtomode}#${ispInfo}-[ss]-[${nameWEB}]\n`;
-      } else {
-        conf += `ss://${btoa(`none:${UUIDS}`)}%3D@${bug}:80?encryption=none&type=ws&host=${inconigtomode}&path=%2F${pathinfo}%2F${proxyHost}%2F${proxyPort}&security=none&sni=${inconigtomode}#${ispInfo}-[SS]-[${nameWEB}]\n`;
-      }
-    } else if (type === 'mix') {
-      if (tls) {
-        conf += `vless://${UUIDS}\u0040${bug}:443?encryption=none&security=tls&sni=${inconigtomode}&fp=randomized&type=ws&host=${inconigtomode}&path=%2F${pathinfo}%2F${proxyHost}%2F${proxyPort}#${ispInfo}-[VL]-[${nameWEB}]\n`;
-        conf += `trojan://${UUIDS}\u0040${bug}:443?encryption=none&security=tls&sni=${inconigtomode}&fp=randomized&type=ws&host=${inconigtomode}&path=%2F${pathinfo}%2F${proxyHost}%2F${proxyPort}#${ispInfo}-[TR]-[${nameWEB}]\n`;
-        conf += `ss://${btoa(`none:${UUIDS}`)}%3D@${bug}:443?encryption=none&type=ws&host=${inconigtomode}&path=%2F${pathinfo}%2F${proxyHost}%2F${proxyPort}&security=tls&sni=${inconigtomode}#${ispInfo}-[SS]-[${nameWEB}]\n`;
-      } else {
-        conf += `vless://${UUIDS}\u0040${bug}:80?path=%2F${pathinfo}%2F${proxyHost}%2F${proxyPort}&security=none&encryption=none&host=${inconigtomode}&fp=randomized&type=ws&sni=${inconigtomode}#${ispInfo}-[VL]-[${nameWEB}]\n`;
-        conf += `trojan://${UUIDS}\u0040${bug}:80?path=%2F${pathinfo}%2F${proxyHost}%2F${proxyPort}&security=none&encryption=none&host=${inconigtomode}&fp=randomized&type=ws&sni=${inconigtomode}#${ispInfo}-[TR]-[${nameWEB}]\n`;
-        conf += `ss://${btoa(`none:${UUIDS}`)}%3D@${bug}:80?encryption=none&type=ws&host=${inconigtomode}&path=%2F${pathinfo}%2F${proxyHost}%2F${proxyPort}&security=none&sni=${inconigtomode}#${ispInfo}-[SS]-[${nameWEB}]\n`;
-      }
-    }
+    return configs[protocol] || "";
   }
 
-  const base64Conf = btoa(conf.replace(/ /g, '%20'));
+  const conf = ips.map(line => {
+    const parts = line.split(',');
+    const [proxyHost, proxyPort = 443, countryCode, isp] = parts;
+    const UUIDS = generateUUIDv4();
+    const ispInfo = `[${countryCode}] ${isp}`;
 
-  return base64Conf;
+    if (type === "mix") {
+      return ["vless", "trojan", "shadowsocks"].map(proto =>
+        generateConfig(proto, UUIDS, proxyHost, proxyPort, ispInfo)
+      ).join("\n");
+    }
+    return generateConfig(type, UUIDS, proxyHost, proxyPort, ispInfo);
+  }).join("\n");
+
+  return btoa(conf.replace(/ /g, '%20'));
 }
 
 
