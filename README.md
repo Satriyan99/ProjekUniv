@@ -6,6 +6,7 @@
 
 InconigtoVPN adalah solusi VPN berbasis Cloudflare Workers yang memungkinkan koneksi aman dan cepat tanpa perlu server fisik. Dengan dukungan protokol **VLESS**, **Trojan**, dan **Shadowsocks**, kamu bisa menikmati kebebasan internet dengan performa tinggi dan latensi rendah.
 
+
 ## 🚀 Instant Deployment on Cloudflare Workers
 
 Deploy dalam hitungan detik ke Cloudflare Workers tanpa perlu VPS atau server tambahan.
@@ -24,6 +25,13 @@ Deploy dalam hitungan detik ke Cloudflare Workers tanpa perlu VPS atau server ta
 
 ## 📌 Disclaimer
 InconigtoVPN dibuat untuk tujuan edukasi dan riset. Pengguna bertanggung jawab penuh atas penggunaan layanan ini.
+
+## 📌 Notes
+Sesuaikan **wrangler.toml**
+Hapus Bagian Routes
+
+*routes = [
+]*
 
 ---
 
