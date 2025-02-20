@@ -7,7 +7,7 @@ const DEFAULT_PROXY_BANK_URL2 = "https://raw.githubusercontent.com/InconigtoVPN/
 // Informasi tambahan
 let nameWEB = "isekaiweb";
 let telegram = "shiyan";
-let costumpath = "isekaiweb;
+let costumpath = "isekaiweb";
 
 
 
