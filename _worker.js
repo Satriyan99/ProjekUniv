@@ -5,9 +5,9 @@ const DEFAULT_PROXY_BANK_URL = "https://raw.githubusercontent.com/InconigtoVPN/P
 const DEFAULT_PROXY_BANK_URL2 = "https://raw.githubusercontent.com/InconigtoVPN/ProxyIP/refs/heads/main/ProxyListURL.txt";
 
 // Informasi tambahan
-let nameWEB = "AFR-CLOUD";
-let telegram = "afrcloud";
-let costumpath = "afrcloud";
+let nameWEB = "isekaiweb";
+let telegram = "shiyan";
+let costumpath = "isekaiweb;
 
 
 
